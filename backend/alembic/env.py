@@ -4,14 +4,22 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
-from decouple import config as envconfig
+from decouple import Config, RepositoryEnv
+from dotenv import find_dotenv
 from core.user.models import User
 from core.post.models import Post
 from database import Base
 
+import os
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+envconfig = Config(RepositoryEnv(".env"))
+app_env = os.getenv("APP_ENV", 'dev')
+if(app_env == 'prod'):
+    env_path = find_dotenv('.env.prod')
+    envconfig = Config(RepositoryEnv(".env"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -19,17 +27,18 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
     
     
-    
-section = config.config_ini_section
-config.set_section_option(section, "DB_NAME", envconfig('DB_NAME'))
-config.set_section_option(section, "DB_PASSWORD", envconfig('DB_PASSWORD'))
-config.set_section_option(section, "DB_USERNAME", envconfig('DB_USERNAME'))
+db_url = f"postgresql://{envconfig('DB_USERNAME')}:{envconfig('DB_PASSWORD')}@{envconfig('DB_HOST')}/{envconfig('DB_NAME')}"    
+# section = config.config_ini_section
+# config.set_section_option(section, "DB_NAME", envconfig('DB_NAME'))
+# config.set_section_option(section, "DB_PASSWORD", envconfig('DB_PASSWORD'))
+# config.set_section_option(section, "DB_USERNAME", envconfig('DB_USERNAME'))
 
 # add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
+config.set_main_option('sqlalchemy.url', db_url)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -49,9 +58,11 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    # url = config.get_main_option("sqlalchemy.url")
+    config_section = config.get_section(config.config_ini_section)
+    config_section['sqlalchemy.url'] = db_url
     context.configure(
-        url=url,
+        url=config_section,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
